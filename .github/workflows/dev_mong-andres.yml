@@ -11,9 +11,14 @@ on:
 
 jobs:
   build:
+  
     runs-on: ubuntu-latest
+    environment: dev                    # ← AGREGAR
     permissions:
       contents: read #This is required for actions/checkout
+    env:                                # ← AGREGAR (bloque completo)
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      MONGO_DB: ${{ vars.MONGO_DB }}
 
     steps:
       - uses: actions/checkout@v4
@@ -26,12 +31,6 @@ jobs:
 
       - name: Build with Maven
         run: mvn clean install
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
-        with:
-          name: java-app
-          path: '${{ github.workspace }}/target/*.jar'
 
   deploy:
     runs-on: ubuntu-latest
