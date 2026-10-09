@@ -85,6 +85,13 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- Azure Storage Queue: para que el micro encole eventos -->
+		<dependency>
+			<groupId>com.azure</groupId>
+			<artifactId>azure-storage-queue</artifactId>
+			<version>12.25.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>

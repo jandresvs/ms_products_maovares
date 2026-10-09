@@ -39,12 +39,14 @@ public class ProductController {
         private final GetProductsQuery getProductsQuery;
         private final GetProductQuery getProductQuery;
         private final CreateProductCommand createProductCommand;
+        private final QueueProducer queueProducer;
 
         public ProductController(GetProductsQuery getProductsQuery, GetProductQuery getProductQuery,
-                        CreateProductCommand createProductCommand) {
+                        CreateProductCommand createProductCommand, QueueProducer queueProducer) {
                 this.getProductsQuery = getProductsQuery;
                 this.getProductQuery = getProductQuery;
                 this.createProductCommand = createProductCommand;
+                this.queueProducer = queueProducer;
         }
 
         @Operation(summary = "Get paginated product lists", description = "Returns a paginated product list, supports query params like: page, size, sort.")
@@ -52,7 +54,7 @@ public class ProductController {
         @ApiResponse(responseCode = "400", description = "Invalid params")
         @GetMapping
         public PagedResponseDto<ProductResponseDto> getProducts(@ParameterObject Pageable pageable) {
-                log.info("Getting products with pagination - Page: {}, Size: {}, Sort: {}", 
+                log.info("Getting products with pagination - Page: {}, Size: {}, Sort: {}",
                         pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
 
                 try {
@@ -70,7 +72,7 @@ public class ProductController {
                                         products.getTotalElements(),
                                         products.getTotalPages());
 
-                        log.info("Successfully retrieved {} products (page {}/{} with {} total elements)", 
+                        log.info("Successfully retrieved {} products (page {}/{} with {} total elements)",
                                 content.size(), products.getNumber() + 1, products.getTotalPages(), products.getTotalElements());
 
                         return response;
@@ -85,7 +87,7 @@ public class ProductController {
         @GetMapping("/{id}")
         public ProductResponseDto getProductById(@PathVariable String id) {
                 log.info("Getting product by ID: {}", id);
-                
+
                 try {
                         Product product = getProductQuery.execute(id);
                         log.info("Successfully retrieved product: {} - {}", product.getId(), product.getTitle());
@@ -100,16 +102,24 @@ public class ProductController {
         @ApiResponse(responseCode = "201", description = "Product created", content = @Content(schema = @Schema(implementation = ProductResponseDto.class)))
         @PostMapping()
         public ResponseEntity<ProductResponseDto> createProduct(@RequestBody @Valid CreateProductDto body) {
-                log.info("Creating new product - Title: {}, Price: {}, Description: {}", 
+                log.info("Creating new product - Title: {}, Price: {}, Description: {}",
                         body.title(), body.price(), body.description());
-                
+
                 try {
                         Product product = createProductCommand.execute(body.description(), body.price(), body.image(),
                                         body.title());
-                        
-                        log.info("Successfully created product: {} - {} with price {}", 
+
+                        log.info("Successfully created product: {} - {} with price {}",
                                 product.getId(), product.getTitle(), product.getPrice());
-                        
+
+                        // --- S10: el micro genera el evento OrderCreated por sí solo ---
+                        String orderJson = String.format(
+                                "{\"orderId\":\"%s\",\"customerEmail\":\"jandresvsv2@gmail.com\"," +
+                                "\"customerName\":\"Cliente Demo\",\"total\":%s," +
+                                "\"items\":[{\"sku\":\"%s\",\"qty\":1}]}",
+                                product.getId(), product.getPrice(), product.getId());
+                        queueProducer.sendOrderCreated(orderJson);
+
                         return ResponseEntity.status(HttpStatus.CREATED)
                                         .body(ProductDtoMapper.toResponse(product));
                 } catch (Exception e) {
